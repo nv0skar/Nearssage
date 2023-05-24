@@ -1,0 +1,19 @@
+[package]
+name = "Nearssage"
+description = "Chat with random people nearby 📍"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+nearssage_commons = { path = "./commons" }
+nearssage_server = { path = "./server" }
+
+[workspace]
+members = ["commons", "server"]
+
+[profile.release]
+lto = true
+
+[profile.dev]
+opt-level = 3
+lto = "thin"
