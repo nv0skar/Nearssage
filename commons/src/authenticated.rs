@@ -14,13 +14,13 @@ pub struct Authenticated<T>(T, AuthenticationCode);
 impl<'de, T: Serialize> Authenticated<T> {
     /// Authenticates type using `Blake3`'s `keyed_hash` function
     pub fn authenticate(key: &[u8; 32], data: T) -> Result<Self> {
-        let authentication = *keyed_hash(key, Data::serialize(&data)?.as_slice()).as_bytes();
+        let authentication = *keyed_hash(key, Encoder::serialize(&data)?.as_slice()).as_bytes();
         Ok(Self(data, authentication))
     }
 
     /// Validates type's authentication
     pub fn validate(self, key: &[u8; 32]) -> Result<T> {
-        if *keyed_hash(key, Data::serialize(&self.0)?.as_slice()).as_bytes() == self.1 {
+        if *keyed_hash(key, Encoder::serialize(&self.0)?.as_slice()).as_bytes() == self.1 {
             Ok(self.0)
         } else {
             bail!("Payload's integrity compromised")

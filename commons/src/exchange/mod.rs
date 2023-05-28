@@ -25,16 +25,16 @@ pub trait Exchangeable {
 
 /// Exchange keys container
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Exchange<T: Serialize + Clone + PartialEq, U: Serialize + Clone>(T, U);
+pub struct Exchange<T: Clone + PartialEq + Serialize, U: Clone + Serialize>(T, U);
 
-impl<T: Serialize + Clone + PartialEq, U: Serialize + Clone> Exchange<T, U> {
+impl<T: Clone + PartialEq + Serialize, U: Clone + Serialize> Exchange<T, U> {
     /// Returns the public key
     pub fn pk_exchange(&self) -> Exchange<T, ()> {
         Exchange(self.0.clone(), ())
     }
 }
 
-impl<T: Serialize + PartialEq + Clone> PartialEq for Exchange<T, ()> {
+impl<T: PartialEq + Clone + Serialize> PartialEq for Exchange<T, ()> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }

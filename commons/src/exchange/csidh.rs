@@ -10,6 +10,7 @@ pub type SKCsidh = Exchange<CsidhPublicKey, CsidhPrivateKey>;
 
 pub type SSCsidh = Bytes;
 
+/// `CSIDH` handling
 impl Exchangeable for SKCsidh {
     type Pub = PKCsidh;
     type SharedSecret = SSCsidh;

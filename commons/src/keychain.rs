@@ -6,7 +6,7 @@ use crate::*;
 pub type PKKeychain = Keychain<PKIdentity, PKExchangePair, PKEcdh>;
 pub type SKKeychain = Keychain<SKIdentity, SKExchangePair, SKEcdh>;
 
-pub trait Keychainable<T: Serialize + PartialEq> {
+pub trait Keychainable<T: PartialEq + Serialize> {
     /// Returns keychain's exchange and pre exchange keys
     fn take(&self) -> Result<T>;
 }
@@ -15,15 +15,15 @@ pub trait Keychainable<T: Serialize + PartialEq> {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Keychain<
     T: Clone + PartialEq,
-    U: Serialize + Clone + PartialEq,
-    V: Serialize + Clone + PartialEq,
+    U: Clone + PartialEq + Serialize,
+    V: Clone + PartialEq + Serialize,
 > {
     sign: T,
     exchange: Signed<U>,
     pre_exchange: Signed<V>,
 }
 
-impl<T: Clone + PartialEq, U: Serialize + Clone + PartialEq, V: Serialize + Clone + PartialEq>
+impl<T: Clone + PartialEq, U: Clone + PartialEq + Serialize, V: Clone + PartialEq + Serialize>
     Keychainable<(Signed<U>, Signed<V>)> for Keychain<Identity<T>, U, V>
 {
     fn take(&self) -> Result<(Signed<U>, Signed<V>)> {

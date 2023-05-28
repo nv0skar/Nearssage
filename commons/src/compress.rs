@@ -3,6 +3,8 @@
 
 use crate::*;
 
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
+
 /// Contains compressed data
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Compressed(Bytes);
@@ -11,14 +13,18 @@ impl Compressed {
     /// Serializes and compresses data
     pub fn new<T: Serialize>(data: &T) -> Result<Self> {
         Ok(Self(
-            zstd::stream::encode_all(Data::serialize(data)?.as_slice(), 0)?.to_smallvec(),
+            compress_prepend_size(Encoder::serialize(data)?.as_slice()).to_smallvec(),
         ))
     }
 
     /// Decompresses and deserializes data
     pub fn take<'de, T: DeserializeOwned>(self) -> Result<T> {
-        let decompressed = zstd::stream::decode_all(self.0.as_slice())?;
-        Ok(Data::deserialize(&decompressed.to_smallvec())?)
+        Ok(Encoder::deserialize(
+            &decompress_size_prepended(self.0.as_slice())
+                .ok()
+                .context("Decompression failed")?
+                .to_smallvec(),
+        )?)
     }
 }
 

@@ -22,7 +22,7 @@ impl Payload {
     /// Creates new payload from serializable data
     pub fn new<T: Serialize>(data: &T) -> Result<Self> {
         Ok(Self {
-            data: Data::serialize(data)?,
+            data: Encoder::serialize(data)?.to_smallvec(),
             encrypted: None,
         })
     }
@@ -38,7 +38,7 @@ impl Payload {
 
     /// Deserializes payload
     pub fn deserialize<'de, T: Deserialize<'de>>(&'de self) -> Result<T> {
-        Data::deserialize(&self.data)
+        Encoder::deserialize(&self.data)
     }
 
     /// Encrypts payload using `ChaCha20`

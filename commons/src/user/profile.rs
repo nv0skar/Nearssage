@@ -12,7 +12,7 @@ pub struct Profile {
     #[rule(Opt(MinMaxLength(0, 256)))]
     about: Option<CompactString>,
     birth: NaiveDate,
-    gender: Gender,
+    gender: Option<Gender>,
 }
 
 #[derive(Clone, PartialEq, Constructor, Serialize, Deserialize, Validator, Display)]
@@ -28,5 +28,4 @@ pub struct Name {
 pub enum Gender {
     Male,
     Female,
-    Other,
 }

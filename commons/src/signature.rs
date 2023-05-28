@@ -7,15 +7,15 @@ use pqcrypto::traits::sign::*;
 
 /// Signed type
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Signed<T: Serialize + Clone + PartialEq> {
+pub struct Signed<T: Clone + PartialEq + Serialize> {
     data: T,
     signature: pqcrypto::sign::falcon1024::DetachedSignature,
 }
 
-impl<T: Serialize + Clone + PartialEq> Signed<T> {
+impl<T: Clone + PartialEq + Serialize> Signed<T> {
     /// Signs the type
     pub fn new(signing: &SKIdentity, data: T) -> Result<Self> {
-        let signature = signing.sign(&Data::serialize(&data)?);
+        let signature = signing.sign(&Encoder::serialize(&data)?);
         Ok(Signed { data, signature })
     }
 
@@ -27,7 +27,7 @@ impl<T: Serialize + Clone + PartialEq> Signed<T> {
 
     /// Verifies the type's signature
     pub fn verify<U: Clone + PartialEq>(&self, signing: &Identity<U>) -> Result<()> {
-        let data = Data::serialize(&self.data)?;
+        let data = Encoder::serialize(&self.data)?;
         signing
             .verify(&data, &self.signature)
             .context("Invalid signature")?;
@@ -35,7 +35,7 @@ impl<T: Serialize + Clone + PartialEq> Signed<T> {
     }
 }
 
-impl<T: Serialize + Clone + PartialEq> PartialEq<Signed<T>> for Signed<T> {
+impl<T: Clone + PartialEq + Serialize> PartialEq<Signed<T>> for Signed<T> {
     fn eq(&self, other: &Signed<T>) -> bool {
         self.data == other.data && self.signature.as_bytes() == other.signature.as_bytes()
     }
