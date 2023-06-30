@@ -7,24 +7,30 @@ use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 
 /// Contains compressed data
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct Compressed(Bytes);
+pub struct Compressed<T: Clone + PartialEq + Encode>(
+    #[serde(skip_serializing)] PhantomData<T>,
+    Bytes,
+);
 
-impl Compressed {
+impl<T: Clone + PartialEq + Encode<Output = Bytes> + Decode<Input = [u8]>> Compressed<T> {
     /// Serializes and compresses data
-    pub fn new<T: Serialize>(data: &T) -> Result<Self> {
+    #[instrument(level = "trace", skip_all, err)]
+    pub async fn new(data: &T) -> Result<Self> {
         Ok(Self(
-            compress_prepend_size(Encoder::serialize(data)?.as_slice()).to_smallvec(),
+            PhantomData,
+            compress_prepend_size(T::encode(data).await?.as_slice()).to_smallvec(),
         ))
     }
 
     /// Decompresses and deserializes data
-    pub fn take<'de, T: DeserializeOwned>(self) -> Result<T> {
-        Ok(Encoder::deserialize(
-            &decompress_size_prepended(self.0.as_slice())
+    #[instrument(level = "trace", skip_all, err)]
+    pub async fn take(self) -> Result<T> {
+        Ok(T::decode(
+            &decompress_size_prepended(self.1.as_slice())
                 .ok()
-                .context("Decompression failed")?
-                .to_smallvec(),
-        )?)
+                .context("Decompression failed")?,
+        )
+        .await?)
     }
 }
 
@@ -32,16 +38,16 @@ impl Compressed {
 mod tests {
     use crate::*;
 
-    #[test]
-    fn compress() -> Result<()> {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn compress() -> Result<()> {
         // Generate some random data
         let random_bytes = SVec::from_slice(&rand::random::<[u8; 32]>());
 
         // Compress the random bytes
-        let compressed = Compressed::new(&random_bytes)?;
+        let compressed = Compressed::new(&random_bytes).await?;
 
         // Check that the random bytes and the decompressed data are the same
-        assert_eq!(compressed.take::<SVec<u8>>()? == random_bytes, true);
+        assert_eq!(compressed.take().await? == random_bytes, true);
 
         Ok(())
     }

@@ -14,19 +14,24 @@ pub struct Initial {
 
 impl Initial {
     /// Creates the payload for the initial message key exchange
-    pub fn new(
+    pub async fn new(
         sk_keychain: SKKeychain,
         pk_keychain: PKKeychain,
         pk_ephemeral: Signed<PKEcdh>,
         pk_one_time: Option<Signed<PKEcdh>>,
     ) -> Result<Self> {
+        pk_ephemeral.verify(sk_keychain.sk_identity()).await?;
         pk_one_time
             .as_ref()
-            .map(|s| -> Result<_> { Ok(s.verify(pk_keychain.pk_identity())?) })
+            .map(|s| -> Result<_> {
+                Ok(tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { s.verify(pk_keychain.pk_identity()).await })
+                })?)
+            })
             .transpose()?;
-        pk_ephemeral.verify(sk_keychain.sk_identity())?;
-        let converted_sk_exchange = sk_keychain.public()?;
-        let (pk_exchange, _): (Signed<PKExchangePair>, _) = converted_sk_exchange.take()?;
+        let converted_sk_exchange = sk_keychain.public().await?;
+        let (pk_exchange, _): (Signed<PKExchangePair>, _) = converted_sk_exchange.take().await?;
         Ok(Self {
             pk_sign: converted_sk_exchange.pk_identity().to_owned(),
             pk_exchange,
@@ -36,7 +41,7 @@ impl Initial {
     }
 
     /// Calculate the session's key from the initial message
-    pub fn agreement(
+    pub async fn agreement(
         &self,
         sk_keychain: SKKeychain,
         sk_one_time: Option<Signed<SKEcdh>>,
@@ -46,25 +51,31 @@ impl Initial {
             "One time key unexpected"
         );
 
-        let (sk_exchange, sk_pre_exchange): (SKExchangePair, SKEcdh) = sk_keychain.take()?;
+        let (sk_exchange, sk_pre_exchange): (SKExchangePair, SKEcdh) = sk_keychain.take().await?;
 
         let sk_one_time = sk_one_time
-            .map(|s| -> Result<_> { s.take(sk_keychain.sk_identity()) })
+            .map(|s| -> Result<_> {
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { s.take(sk_keychain.sk_identity()).await })
+                })
+            })
             .transpose()?;
 
         let message_identity = self.pk_sign.pk_identity();
 
-        let pk_exchange = self.pk_exchange.clone().take(&message_identity)?;
+        let pk_exchange = self.pk_exchange.clone().take(&message_identity);
 
-        let pk_ephemeral = self.pk_ephemeral.clone().take(&message_identity)?;
+        let pk_ephemeral = self.pk_ephemeral.clone().take(&message_identity);
 
         Ok(session_key(
             Right(sk_one_time),
             sk_exchange,
             sk_pre_exchange,
-            pk_exchange,
-            pk_ephemeral,
-        )?)
+            pk_exchange.await?,
+            pk_ephemeral.await?,
+        )
+        .await?)
     }
 
     /// Returns one time key

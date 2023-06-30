@@ -12,6 +12,7 @@ use crate::*;
 pub type PKExchangePair = (PKEcdh, PKCsidh);
 pub type SKExchangePair = (SKEcdh, SKCsidh);
 
+#[async_trait]
 pub trait Exchangeable {
     type Pub;
     type SharedSecret;
@@ -20,7 +21,7 @@ pub trait Exchangeable {
     fn new() -> Self;
 
     /// Returns the shared secret
-    fn get_secret(&self, pub_key: &Self::Pub) -> Self::SharedSecret;
+    async fn get_secret(&self, pub_key: &Self::Pub) -> Self::SharedSecret;
 }
 
 /// Exchange keys container

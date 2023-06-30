@@ -10,7 +10,7 @@ use crate::*;
 pub type ChainKey = [u8; 32];
 pub type MessageKey = [u8; 32];
 
-pub type CipheredMessageData = Authenticated<Payload>;
+pub type CipheredMessageData = Authenticated<Crypt<Bytes>>;
 
 /// Message's encrypted contents and metadata
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

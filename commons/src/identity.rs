@@ -3,7 +3,6 @@
 
 use crate::*;
 
-use anyhow::Ok;
 use pqcrypto::sign::falcon1024::*;
 
 pub type PKIdentity = Identity<()>;
@@ -17,6 +16,7 @@ pub type SKSign = SecretKey;
 pub struct Identity<T: Clone + PartialEq>(PKSign, T);
 
 impl<T: Clone + PartialEq> Identity<T> {
+    // Get public identity
     pub fn pk_identity(&self) -> PKIdentity {
         Identity(self.0, ())
     }
@@ -26,7 +26,9 @@ impl<T: Clone + PartialEq> Identity<T> {
         Identity(*pk_signing, ())
     }
 
-    pub fn verify(&self, data: &[u8], sig: &DetachedSignature) -> Result<()> {
+    // Verifies the signature of some data
+    #[instrument(level = "trace", skip_all, err)]
+    pub async fn verify(&self, data: &[u8], sig: &DetachedSignature) -> Result<()> {
         verify_detached_signature(&sig, data, &self.0)?;
         Ok(())
     }
@@ -40,7 +42,8 @@ impl SKIdentity {
     }
 
     /// Signs some data
-    pub fn sign(&self, data: &[u8]) -> DetachedSignature {
+    #[instrument(level = "trace", skip_all)]
+    pub async fn sign(&self, data: &[u8]) -> DetachedSignature {
         detached_sign(data, &self.1)
     }
 }

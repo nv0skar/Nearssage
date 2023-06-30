@@ -8,7 +8,7 @@ use crate::*;
 pub struct Profile {
     #[rule(Validate())]
     name: Name,
-    picture: Payload,
+    picture: Bytes,
     #[rule(Opt(MinMaxLength(0, 256)))]
     about: Option<CompactString>,
     birth: NaiveDate,

@@ -11,16 +11,18 @@ pub type AuthenticationCode = [u8; 32];
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Authenticated<T>(T, AuthenticationCode);
 
-impl<'de, T: Serialize> Authenticated<T> {
+impl<'de, T: Encode<Output = Bytes>> Authenticated<T> {
     /// Authenticates type using `Blake3`'s `keyed_hash` function
-    pub fn authenticate(key: &[u8; 32], data: T) -> Result<Self> {
-        let authentication = *keyed_hash(key, Encoder::serialize(&data)?.as_slice()).as_bytes();
+    #[instrument(level = "trace", skip_all, err)]
+    pub async fn authenticate(key: &[u8; 32], data: T) -> Result<Self> {
+        let authentication = *keyed_hash(key, T::encode(&data).await?.as_slice()).as_bytes();
         Ok(Self(data, authentication))
     }
 
     /// Validates type's authentication
-    pub fn validate(self, key: &[u8; 32]) -> Result<T> {
-        if *keyed_hash(key, Encoder::serialize(&self.0)?.as_slice()).as_bytes() == self.1 {
+    #[instrument(level = "trace", skip_all, err)]
+    pub async fn validate(self, key: &[u8; 32]) -> Result<T> {
+        if *keyed_hash(key, T::encode(&self.0).await?.as_slice()).as_bytes() == self.1 {
             Ok(self.0)
         } else {
             bail!("Payload's integrity compromised")
@@ -32,8 +34,8 @@ impl<'de, T: Serialize> Authenticated<T> {
 mod tests {
     use crate::*;
 
-    #[test]
-    fn authentication() -> Result<()> {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn authentication() -> Result<()> {
         // Generate some random data
         let random_bytes = SVec::from_slice(&rand::random::<[u8; 32]>());
 
@@ -41,16 +43,19 @@ mod tests {
         let valid_key = &rand::random::<[u8; 32]>();
 
         // Authenticate the random data with the random key
-        let authenticated = Authenticated::authenticate(valid_key, random_bytes)?;
+        let authenticated = Authenticated::authenticate(valid_key, random_bytes).await?;
 
         // Check that the authenticated data is valid with the valid key
-        assert_eq!(authenticated.clone().validate(valid_key).is_ok(), true);
+        assert_eq!(
+            authenticated.clone().validate(valid_key).await.is_ok(),
+            true
+        );
 
         // Generates an invalid random key for validation
-        let invalid_key = &rand::random::<[u8; 32]>();
+        let invalid_key = valid_key.map(|s| !s);
 
         // Check that the authenticated data is not valid with an invalid key
-        assert_eq!(authenticated.validate(invalid_key).is_ok(), false);
+        assert_eq!(authenticated.validate(&invalid_key).await.is_ok(), false);
 
         Ok(())
     }

@@ -5,24 +5,49 @@ use crate::*;
 
 use stackalloc::stackalloc;
 
-pub struct Encoder;
+#[async_trait]
+pub trait Encode {
+    type Output;
 
-impl Encoder {
+    /// Encodes data from `T` into bytes
+    async fn encode(&self) -> Result<Self::Output>;
+}
+
+#[async_trait]
+pub trait Decode {
+    type Input: ?Sized;
+
+    /// Decodes from bytes into `T`
+    async fn decode<'a>(data: &'a Self::Input) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+#[async_trait]
+impl<T: Serialize + Send + Sync> Encode for T {
+    type Output = Bytes;
+
     /// Serializes data from `T` into bytes
-    pub fn serialize<T: Serialize>(data: &T) -> Result<Bytes> {
+    #[instrument(level = "trace", skip_all, err)]
+    async fn encode(&self) -> Result<Self::Output> {
         Ok(stackalloc(
-            postcard::experimental::serialized_size(data)?,
+            postcard::experimental::serialized_size(self)?,
             u8::default(),
             |buffer: &mut [u8]| -> Result<Bytes> {
-                Ok(postcard::to_slice(data, buffer)
+                Ok(postcard::to_slice(self, buffer)
                     .context("Failed to serialize payload")?
                     .to_smallvec())
             },
         )?)
     }
+}
 
-    /// Deserializes from bytes into `T`
-    pub fn deserialize<'de, T: Deserialize<'de>>(data: &'de Bytes) -> Result<T> {
-        Ok(postcard::from_bytes(data.as_slice()).context("Unable to deserialize payload")?)
+#[async_trait]
+impl<T: DeserializeOwned + Send + Sync> Decode for T {
+    type Input = [u8];
+
+    #[instrument(level = "trace", skip_all, err)]
+    async fn decode<'a>(data: &'a Self::Input) -> Result<Self> {
+        Ok(postcard::from_bytes(&data).context("Unable to deserialize payload")?)
     }
 }
