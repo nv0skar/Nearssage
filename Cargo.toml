@@ -4,14 +4,11 @@ description = "Talk with random people nearby 📍"
 version = "0.0.1"
 edition = "2021"
 
-[dependencies]
-nearssage_server = { path = "./server" }
-
 [workspace]
-members = ["commons", "protocol", "server"]
+members = ["commons", "protocol", "server", "client"]
 
 [profile.release]
 lto = true
 
 [profile.dev]
-opt-level = 3
+opt-level = 1

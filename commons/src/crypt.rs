@@ -58,7 +58,7 @@ mod tests {
         let decrypted = encrypted.clone().take(random_key).await?;
 
         // Check that the initial data and the decrypted data are the same
-        assert_eq!(random_bytes == decrypted, true);
+        assert_eq!(random_bytes, decrypted);
 
         Ok(())
     }

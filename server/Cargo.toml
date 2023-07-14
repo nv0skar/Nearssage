@@ -8,7 +8,6 @@ edition = "2021"
 nearssage_commons = { path = "../commons" }
 nearssage_protocol = { path = "../protocol" }
 tokio = { version = "1.28", features = ["full"] }
-async-trait = "0.1"
 flume = "0.10"
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -16,30 +15,22 @@ tracing-appender = "0.2"
 metrics = "0.21"
 metrics-tracing-context = "0.14"
 udp-stream = "0"
-smallbox = "0.8"
 smallvec = { version = "1.10", features = ["serde", "write"] }
-arrayvec = "0.7"
 stackalloc = "1"
 rclite = "0.2"
 atomic_refcell = "0.1"
 dashmap = "5.4"
 compact_str = { version = "0.7", features = ["serde"] }
 type-rules = { version = "0.2", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.3", features = ["derive"] }
 figment = { version = "0.10", features = ["toml"] }
-tempfile = "3.6"
-rand_core = "0.6"
-argon2 = "0.5"
-prometheus = "0.13"
-faster-hex = { git = "https://github.com/nervosnetwork/faster-hex.git" }
+base64 = "0.21"
 colored = "2"
-email_address = "0.2"
-phonenumber = "0.3.2+8.13.9"
 derive_more = "0.99"
-getset = "0"
 either = "1"
 anyhow = "1"
 
+[dev-dependencies]
+nearssage_client = { path = "../client" }

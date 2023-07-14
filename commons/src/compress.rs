@@ -47,7 +47,7 @@ mod tests {
         let compressed = Compressed::new(&random_bytes).await?;
 
         // Check that the random bytes and the decompressed data are the same
-        assert_eq!(compressed.take().await? == random_bytes, true);
+        assert_eq!(compressed.take().await?, random_bytes);
 
         Ok(())
     }

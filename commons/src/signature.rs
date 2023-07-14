@@ -64,13 +64,10 @@ mod tests {
         let signed_bytes = Signed::new(&valid_identity, random_bytes).await?;
 
         // Check that the signature of the signed data with the valid identity is valid
-        assert_eq!(
-            signed_bytes.clone().take(&valid_identity).await.is_ok(),
-            true
-        );
+        assert!(signed_bytes.clone().take(&valid_identity).await.is_ok());
 
         // Check that the signature of the signed data with the invalid identity is not valid
-        assert_eq!(signed_bytes.take(&invalid_identity).await.is_ok(), false);
+        assert!(signed_bytes.take(&invalid_identity).await.is_err());
 
         Ok(())
     }
@@ -87,7 +84,7 @@ mod tests {
         let mut signed_bytes = Signed::new(&identity, random_bytes).await?;
 
         // Check that the signature of the signed data with the valid signature is valid
-        assert_eq!(signed_bytes.clone().take(&identity).await.is_ok(), true);
+        assert!(signed_bytes.clone().take(&identity).await.is_ok());
 
         // Changing signature
         signed_bytes.1 .0 = pqcrypto::sign::falcon1024::DetachedSignature::from_bytes(
@@ -98,7 +95,7 @@ mod tests {
         )?;
 
         // Check that the signature of the signed data with the invalid signature is not valid
-        assert_eq!(signed_bytes.take(&identity).await.is_ok(), false);
+        assert!(signed_bytes.take(&identity).await.is_ok());
 
         Ok(())
     }

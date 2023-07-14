@@ -4,7 +4,10 @@
 use nearssage_commons::*;
 use nearssage_server::*;
 
+use std::any::Any;
+
 use anyhow::{Context, Result};
+use base64::prelude::*;
 use clap::{Parser, Subcommand};
 use colored::*;
 use compact_str::{CompactString, ToCompactString};
@@ -12,6 +15,7 @@ use figment::{
     providers::{Format, Serialized, Toml},
     Figment,
 };
+use tracing_subscriber::prelude::*;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -41,7 +45,8 @@ async fn main() -> Result<()> {
             let raw_keypair = Compressed::new(&SKIdentity::new()).await?.encode().await?;
             println!(
                 "Signing Keypair: {}",
-                faster_hex::hex_string(&raw_keypair)
+                BASE64_STANDARD_NO_PAD
+                    .encode(&raw_keypair)
                     .bright_purple()
                     .bold()
                     .blink()
@@ -61,13 +66,99 @@ async fn main() -> Result<()> {
                 .set(config)
                 .ok()
                 .context("Cannot set server's global config")?;
-            let _guard = analytics::tracing::subscribe();
+            let _guard = subscribe();
             #[cfg(not(debug_assertions))]
             {
-                analytics::metrics::describe_metrics();
+                describe_metrics();
             }
             let _ = Handler::default().run().await;
         }
     }
     Ok(())
+}
+
+/// Subscribe for the release build's tracing
+#[cfg(not(debug_assertions))]
+pub fn subscribe() -> impl Any {
+    use crate::*;
+
+    let config = CONFIG.get().unwrap();
+
+    let log_appender = tracing_appender::rolling::daily(
+        format!("{}/{}", config.path, config.log_subpath),
+        format!("{}.log", env!("CARGO_PKG_NAME")),
+    );
+    let (log_writer, _guard) = tracing_appender::non_blocking(log_appender);
+
+    let target = tracing_subscriber::filter::Targets::new()
+        .with_target(env!("CARGO_CRATE_NAME"), tracing::Level::WARN)
+        .with_target("nearssage_protocol", tracing::Level::WARN);
+
+    tracing_subscriber::fmt()
+        .with_thread_ids(true)
+        .with_line_number(false)
+        .compact()
+        .with_writer(log_writer)
+        .finish()
+        .with(target)
+        .with(metrics_tracing_context::MetricsLayer::new())
+        .init();
+
+    _guard
+}
+
+/// Subscribe for the debug build's tracing
+#[cfg(debug_assertions)]
+pub fn subscribe() -> impl Any {
+    let target = tracing_subscriber::filter::Targets::new()
+        .with_target(env!("CARGO_CRATE_NAME"), tracing::Level::TRACE)
+        .with_target("nearssage_protocol", tracing::Level::TRACE);
+
+    tracing_subscriber::fmt()
+        .with_thread_ids(true)
+        .with_line_number(false)
+        .pretty()
+        .finish()
+        .with(target)
+        .init()
+}
+
+/// Describes the metrics
+#[cfg(not(debug_assertions))]
+pub fn describe_metrics() {
+    use nearssage_protocol::*;
+
+    use metrics::*;
+
+    const CONNECTION_KEY: &str = "connection";
+    const CLIENT_KEY: &str = "client";
+    const REQUEST_KEY: &str = "request";
+    const MALFORMED_REQUEST_KEY: &str = "malformed_request";
+    const UNFULFILLED_REQUEST_KEY: &str = "unfulfilled_request";
+    const RECEIVING_KEY: &str = "receiving";
+    const SENDING_KEY: &str = "sending";
+
+    describe_histogram!(CONNECTION_KEY, Unit::Count, "Connections");
+    describe_histogram!(CLIENT_KEY, Unit::Count, "Clients");
+    describe_counter!(REQUEST_KEY, Unit::CountPerSecond, "Requests per Second");
+    describe_counter!(
+        MALFORMED_REQUEST_KEY,
+        Unit::CountPerSecond,
+        "Malformed requests per Second"
+    );
+    describe_counter!(
+        UNFULFILLED_REQUEST_KEY,
+        Unit::CountPerSecond,
+        "Unfulfilled requests per Second"
+    );
+    describe_histogram!(RECEIVING_KEY, Unit::Bytes, "Receiving data");
+    describe_histogram!(SENDING_KEY, Unit::Bytes, "Sending data");
+
+    let _ = CONNECTION.set(register_histogram!(CONNECTION_KEY));
+    let _ = CLIENT.set(register_histogram!(CLIENT_KEY));
+    let _ = REQUEST.set(register_counter!(REQUEST_KEY));
+    let _ = MALFORMED_REQUEST.set(register_counter!(MALFORMED_REQUEST_KEY));
+    let _ = UNFULFILLED_REQUEST.set(register_counter!(UNFULFILLED_REQUEST_KEY));
+    let _ = RECEIVING.set(register_histogram!(RECEIVING_KEY));
+    let _ = SENDING.set(register_histogram!(SENDING_KEY));
 }

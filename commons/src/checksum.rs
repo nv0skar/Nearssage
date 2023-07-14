@@ -47,7 +47,7 @@ mod tests {
         let checksumed_bytes = Checksumed::new(random_bytes).await?;
 
         // Check that the checksum is valid
-        assert_eq!(checksumed_bytes.verify().await.is_ok(), true);
+        assert!(checksumed_bytes.verify().await.is_ok());
 
         // Corrupt the checksumed random data
         let mut corrupted_checksumed_bytes = checksumed_bytes.clone();
@@ -57,7 +57,7 @@ mod tests {
             .map(|s| *s = !*s);
 
         // Check that the checksum of the corrupted data is not valid
-        assert_eq!(corrupted_checksumed_bytes.verify().await.is_ok(), false);
+        assert!(corrupted_checksumed_bytes.verify().await.is_err());
 
         Ok(())
     }

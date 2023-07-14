@@ -55,7 +55,7 @@ mod tests {
         let alice_shared_secret = alice.get_secret(&pk_bob);
 
         // Check that the shared secret is the some for both
-        assert_eq!(bob_shared_secret.await == alice_shared_secret.await, true);
+        assert_eq!(bob_shared_secret.await, alice_shared_secret.await);
 
         Ok(())
     }

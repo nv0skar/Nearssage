@@ -46,16 +46,13 @@ mod tests {
         let authenticated = Authenticated::authenticate(valid_key, random_bytes).await?;
 
         // Check that the authenticated data is valid with the valid key
-        assert_eq!(
-            authenticated.clone().validate(valid_key).await.is_ok(),
-            true
-        );
+        assert!(authenticated.clone().validate(valid_key).await.is_ok());
 
         // Generates an invalid random key for validation
         let invalid_key = valid_key.map(|s| !s);
 
         // Check that the authenticated data is not valid with an invalid key
-        assert_eq!(authenticated.validate(&invalid_key).await.is_ok(), false);
+        assert!(authenticated.validate(&invalid_key).await.is_err());
 
         Ok(())
     }

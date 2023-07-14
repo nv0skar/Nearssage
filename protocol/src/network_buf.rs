@@ -3,11 +3,11 @@
 
 use crate::*;
 
-pub const AUTH_BUF_LEN: usize = 32 * 1024 * 1024;
-pub const UNAUTH_BUF_LEN: usize = 4096;
+pub const BUF_LEN: usize = 32 * 1024 * 1024;
+pub const REDUCED_BUF_LEN: usize = 4096;
 
 /// Dynamic size network request buffer
-pub struct NetworkBuf(Option<Either<[u8; UNAUTH_BUF_LEN], SmallBox<[u8; AUTH_BUF_LEN], S64>>>);
+pub struct NetworkBuf(Option<Either<[u8; REDUCED_BUF_LEN], SmallBox<[u8; BUF_LEN], S64>>>);
 
 impl NetworkBuf {
     /// Creates new buffer without initializing array
@@ -16,10 +16,10 @@ impl NetworkBuf {
     }
 
     /// Initializes a new buffer depending if a client is authenticated
-    pub fn buffer(&mut self, auth: bool) -> &mut [u8] {
-        self.0 = Some(match auth {
-            true => Right(SmallBox::new([0_u8; AUTH_BUF_LEN])),
-            false => Left([0_u8; UNAUTH_BUF_LEN]),
+    pub fn buffer(&mut self, reduced: bool) -> &mut [u8] {
+        self.0 = Some(match reduced {
+            true => Left([0_u8; REDUCED_BUF_LEN]),
+            false => Right(SmallBox::new([0_u8; BUF_LEN])),
         });
         match self.0.as_mut().unwrap() {
             Left(buf) => buf.as_mut_slice(),

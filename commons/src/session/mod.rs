@@ -127,7 +127,7 @@ mod tests {
             .await?;
 
         // Check that the session key is the same for both Alice and Bob
-        assert_eq!(alice_sk_session == bob_sk_session, true);
+        assert_eq!(alice_sk_session, bob_sk_session);
 
         Ok(())
     }

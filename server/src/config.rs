@@ -3,6 +3,8 @@
 
 use crate::*;
 
+use base64::prelude::*;
+
 pub struct Config {
     pub serve_addr: SocketAddr,
     pub db_addr: SocketAddr,
@@ -29,10 +31,10 @@ impl Args {
             .signing_keypair
             .context("Signing Keypair is not set!")?;
         let raw_keypair = stackalloc(
-            encoded_keypair.as_bytes().len() / 2,
+            base64::decoded_len_estimate(encoded_keypair.as_bytes().len()),
             u8::default(),
             |buffer: &mut [u8]| -> Result<Bytes> {
-                faster_hex::hex_decode(encoded_keypair.as_bytes(), buffer)?;
+                BASE64_STANDARD_NO_PAD.decode_slice(encoded_keypair.as_bytes(), buffer)?;
                 Ok(buffer.to_smallvec())
             },
         )?;
