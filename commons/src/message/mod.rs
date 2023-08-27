@@ -15,8 +15,8 @@ pub type CipheredMessageData = Authenticated<Crypt<Bytes>>;
 /// Message's encrypted contents and metadata
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
-    sender: UserID,
-    recipient: UserID,
+    // sender: UserID,
+    // recipient: UserID,
     initial: Option<Initial>,
     height: MessageHeight,
     ratchet_key: PKEcdh,

@@ -27,8 +27,14 @@ impl<
 {
     /// Receives data from peer, copies it into the buffer and deserializes it
     #[instrument(level = "trace", skip_all)]
-    pub async fn receive(stream: &mut UdpStream, buf: &mut [u8]) -> Result<Self, ReceivedStatus> {
-        match timeout(Duration::from_millis(CONNECTION_TIMEOUT), stream.read(buf)).await {
+    pub async fn receive(stream: &mut UdpStream) -> Result<Self, ReceivedStatus> {
+        let mut buf = [0_u8; 512];
+        match timeout(
+            Duration::from_millis(CONNECTION_TIMEOUT),
+            stream.read(&mut buf),
+        )
+        .await
+        {
             Ok(received) => match received {
                 Ok(len) => {
                     tracing::debug!("Received {} bytes", len);

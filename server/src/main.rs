@@ -3,10 +3,12 @@
 
 use nearssage_commons::*;
 use nearssage_server::*;
+use nearssage_storage::*;
 
-use std::any::Any;
+use std::{any::Any, path::Path};
 
 use anyhow::{Context, Result};
+use atomic_refcell::AtomicRefCell;
 use base64::prelude::*;
 use clap::{Parser, Subcommand};
 use colored::*;
@@ -15,33 +17,35 @@ use figment::{
     providers::{Format, Serialized, Toml},
     Figment,
 };
+use rclite::Arc;
+use redb::Database;
 use tracing_subscriber::prelude::*;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
 struct CommandParser {
-    #[arg(short = 'P', long = "path", default_value_t = DEF_PATH.to_compact_string())]
+    #[arg(short = 'P', long = "p", default_value_t = DEF_PATH.to_compact_string())]
     path: CompactString,
-    #[arg(long = "config_subpath", default_value_t = DEF_CONFIG_PATH.to_compact_string())]
-    config_subpath: CompactString,
+    #[arg(long = "config_file", default_value_t = DEF_CONFIG_FILE.to_compact_string())]
+    config_file: CompactString,
     #[command(subcommand)]
-    command: Commands,
+    action: Action,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+enum Action {
     #[command(about = "Generates a new compressed signing keypair in hexadecimal")]
     GenerateSigningKeypair,
     #[command(about = "Runs the server")]
-    Run(config::Args),
+    Run(config::Config),
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let action = CommandParser::parse();
-    match action.command {
-        Commands::GenerateSigningKeypair => {
+    match action.action {
+        Action::GenerateSigningKeypair => {
             let raw_keypair = Compressed::new(&SKIdentity::new()).await?.encode().await?;
             println!(
                 "Signing Keypair: {}",
@@ -52,26 +56,27 @@ async fn main() -> Result<()> {
                     .blink()
             );
         }
-        Commands::Run(args) => {
+        Action::Run(args) => {
             let config = Figment::new()
                 .merge(Toml::file(format!(
                     "{}/{}",
-                    action.path, action.config_subpath
+                    action.path, action.config_file
                 )))
                 .merge(Serialized::defaults(args))
-                .extract::<config::Args>()?
-                .config(action.path)
-                .await?;
-            CONFIG
-                .set(config)
-                .ok()
-                .context("Cannot set server's global config")?;
-            let _guard = subscribe();
+                .extract::<config::Config>()?;
+            let _guard = subscribe(config.log_path());
             #[cfg(not(debug_assertions))]
             {
                 describe_metrics();
             }
-            let _ = Handler::default().run().await;
+            DB.set(AtomicRefCell::new(Arc::new(Database::create(
+                config.db_path(),
+            )?)))?;
+            IDENTITY
+                .set(config.identity().await?)
+                .ok()
+                .context("Cannot set server's identity!")?;
+            let _ = Handler::default().run(config.listen_addr).await;
         }
     }
     Ok(())
@@ -79,15 +84,13 @@ async fn main() -> Result<()> {
 
 /// Subscribe for the release build's tracing
 #[cfg(not(debug_assertions))]
-pub fn subscribe() -> impl Any {
+pub fn subscribe(log_path: impl AsRef<Path>) -> impl Any {
     use crate::*;
 
     let config = CONFIG.get().unwrap();
 
-    let log_appender = tracing_appender::rolling::daily(
-        format!("{}/{}", config.path, config.log_subpath),
-        format!("{}.log", env!("CARGO_PKG_NAME")),
-    );
+    let log_appender =
+        tracing_appender::rolling::daily(log_path, format!("{}.log", env!("CARGO_PKG_NAME")));
     let (log_writer, _guard) = tracing_appender::non_blocking(log_appender);
 
     let target = tracing_subscriber::filter::Targets::new()
@@ -109,7 +112,7 @@ pub fn subscribe() -> impl Any {
 
 /// Subscribe for the debug build's tracing
 #[cfg(debug_assertions)]
-pub fn subscribe() -> impl Any {
+pub fn subscribe(_: impl AsRef<Path>) -> impl Any {
     let target = tracing_subscriber::filter::Targets::new()
         .with_target(env!("CARGO_CRATE_NAME"), tracing::Level::TRACE)
         .with_target("nearssage_protocol", tracing::Level::TRACE);

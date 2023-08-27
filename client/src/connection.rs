@@ -9,14 +9,9 @@ pub struct Connection(Arc<AtomicRefCell<Session>>);
 
 impl Connection {
     /// Starts a new connection
-    #[instrument(
-        name = "new_connection",
-        skip_all,
-        fields(
-            addr = %CONFIG.get().unwrap().server_addr
-    ))]
-    pub async fn new() -> Result<(Self, SocketAddr)> {
-        let mut stream = UdpStream::connect(CONFIG.get().unwrap().server_addr).await?;
+    #[instrument(name = "new_connection")]
+    pub async fn new(addr: SocketAddr) -> Result<(Self, SocketAddr)> {
+        let mut stream = UdpStream::connect(addr).await?;
         let local_addr = stream.local_addr()?;
         tracing::trace!("Stream established!");
         let (sending_channel, receiving_channel) = unbounded::<ClientSignal>();
@@ -36,12 +31,12 @@ impl Connection {
         mut stream: UdpStream,
         receiving_channel: Receiver<ClientSignal>,
     ) {
-        let mut buf = NetworkBuf::new();
+        // let mut buf = NetworkBuf::new();
         tokio::spawn(async move {
             tracing::trace!("Started handling server's signals");
             loop {
                 tokio::select! {
-                    peer_receiver = self.handle_signal(&mut stream, &mut buf) => {
+                    peer_receiver = self.handle_signal(&mut stream) => {
                         if let Err(err) = peer_receiver {
                             tracing::info!("Will close connection! {}", err.to_string());
                             Connection::close_connection(&mut stream);
@@ -64,9 +59,9 @@ impl Connection {
 
     /// Handle server's signals
     #[instrument(skip_all, err)]
-    async fn handle_signal(&mut self, stream: &mut UdpStream, buf: &mut NetworkBuf) -> Result<()> {
-        let reduced_buffer = !self.borrow().auth;
-        match ServerSignal::receive(stream, buf.buffer(reduced_buffer)).await {
+    async fn handle_signal(&mut self, stream: &mut UdpStream) -> Result<()> {
+        // let reduced_buffer = !self.borrow().auth;
+        match ServerSignal::receive(stream).await {
             Ok(req) => {
                 let mut session = self.borrow_mut();
                 match req {
@@ -88,7 +83,11 @@ impl Connection {
                                     &pk_exchange
                                         .take()
                                         .await?
-                                        .take(&CONFIG.get().unwrap().signing_keypair)
+                                        .take(
+                                            SERVER_IDENTITY
+                                                .get()
+                                                .context("Server identity not set!")?,
+                                        )
                                         .await?,
                                 )
                                 .await,
@@ -107,10 +106,7 @@ impl Connection {
                     Signal::Error(_) => Err(anyhow!("Stream invalidated by server!")),
                 }
             }
-            Err(err) => {
-                println!("{:?}", err);
-                Ok(())
-            }
+            Err(status) => Err(anyhow!(status)),
         }
     }
 }

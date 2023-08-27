@@ -5,30 +5,33 @@ use crate::*;
 
 use base64::prelude::*;
 
-pub struct Config {
-    pub serve_addr: SocketAddr,
-    pub db_addr: SocketAddr,
-    pub signing_keypair: SKIdentity,
-    pub path: CompactString,
-    pub log_subpath: CompactString,
-}
-
 #[derive(Args, Serialize, Deserialize, Debug)]
-pub struct Args {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    db_addr: Option<SocketAddr>,
+pub struct Config {
     #[serde(skip_serializing_if = "Option::is_none")]
     signing_keypair: Option<CompactString>,
     #[arg(short = 'L', long = "listen", default_value_t = format!("0.0.0.0:{}", DEF_PORT).parse().unwrap())]
-    serve_addr: SocketAddr,
-    #[arg(long = "log_subpath", default_value_t = DEF_LOG_PATH.to_compact_string())]
-    log_subpath: CompactString,
+    pub listen_addr: SocketAddr,
+    #[arg(long = "home_dir", default_value_t = DEF_DB_FILE.to_compact_string())]
+    path: CompactString,
+    #[arg(long = "db_file", default_value_t = DEF_DB_FILE.to_compact_string())]
+    db_file: CompactString,
+    #[arg(long = "log_dir", default_value_t = DEF_LOG_DIR.to_compact_string())]
+    log_dir: CompactString,
 }
 
-impl Args {
-    pub async fn config(self, path: CompactString) -> Result<Config> {
+impl Config {
+    pub fn db_path(&self) -> impl AsRef<Path> {
+        format!("{}/{}", self.path, self.db_file)
+    }
+
+    pub fn log_path(&self) -> impl AsRef<Path> {
+        format!("{}/{}", self.path, self.log_dir)
+    }
+
+    pub async fn identity(&self) -> Result<SKIdentity> {
         let encoded_keypair = self
             .signing_keypair
+            .clone()
             .context("Signing Keypair is not set!")?;
         let raw_keypair = stackalloc(
             base64::decoded_len_estimate(encoded_keypair.as_bytes().len()),
@@ -38,17 +41,11 @@ impl Args {
                 Ok(buffer.to_smallvec())
             },
         )?;
-        Ok(Config {
-            serve_addr: self.serve_addr,
-            db_addr: self.db_addr.expect("Database address is not set!"),
-            signing_keypair: Compressed::<SKIdentity>::decode(&raw_keypair)
-                .await
-                .context("Failed to decode compressed signing keypair!")?
-                .take()
-                .await
-                .context("Failed to decompress signing keypair!")?,
-            path,
-            log_subpath: self.log_subpath.clone(),
-        })
+        Ok(Compressed::<SKIdentity>::decode(&raw_keypair)
+            .await
+            .context("Failed to decode compressed signing keypair!")?
+            .take()
+            .await
+            .context("Failed to decompress signing keypair!")?)
     }
 }

@@ -5,10 +5,10 @@ version = "0.0.1"
 edition = "2021"
 
 [workspace]
-members = ["commons", "protocol", "server", "client"]
+members = ["commons", "protocol", "schema", "storage", "server", "client"]
 
-[profile.release]
-lto = true
+# [profile.release]
+# lto = true
 
-[profile.dev]
-opt-level = 1
+# [profile.dev]
+# opt-level = 1

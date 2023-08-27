@@ -1,0 +1,16 @@
+[package]
+name = "nearssage_schema"
+description = "Nearssages's schema 🎯"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+nearssage_commons = { path = "../commons" }
+arrayvec = { version = "0.7", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+type-rules = { version = "0.2", features = ["derive"] }
+email_address = "0.2"
+phonenumber = "0.3"
+geo = { version = "0.26", features = ["use-serde"] }
+serde = { version = "1.0", features = ["derive"] }
+derive_more = "0.99"

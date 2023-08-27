@@ -12,7 +12,6 @@ pub mod keychain;
 pub mod message;
 pub mod session;
 pub mod signature;
-pub mod user;
 
 pub use authenticated::*;
 pub use checksum::*;
@@ -25,24 +24,22 @@ pub use keychain::*;
 pub use message::*;
 pub use session::*;
 pub use signature::*;
-pub use user::*;
 
 use std::marker::PhantomData;
 
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use chrono::prelude::*;
-use compact_str::CompactString;
-use derive_more::{Constructor, Display};
-use either::{Either, Left, Right};
+use either::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use smallvec::{SmallVec, ToSmallVec};
 use tokio::*;
 use tracing::instrument;
-use type_rules::prelude::*;
 
 pub type SVec<T> = SmallVec<[T; 64]>;
 pub type Bytes = SVec<u8>;
 
-pub type UserID = u32;
+pub type UserID = [u8; 16];
+pub type DeviceID = [u8; 32];
+
 pub type MessageHeight = u128;

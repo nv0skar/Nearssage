@@ -14,7 +14,7 @@ pub struct Client {
 }
 
 pub enum SubsignalHandlerResolution {
-    Send(MessageHeight, Checksumed<Crypt<Subsignal<ServerCodec>>>),
+    Send(ServerSignal),
     Disconnect,
 }
 
@@ -94,8 +94,32 @@ impl Client {
     ) -> Result<Option<SubsignalHandlerResolution>> {
         self.height.receiving(height)?;
         match signal.desugar(&self.shared_secret).await? {
-            Subsignal::Content(_) => todo!(),
-            Subsignal::Error(_) => Ok(None),
+            Subsignal::Content(content) => {
+                let content = content.take().await?;
+                if content.check_validity().is_err() {
+                    return Ok(Some(SubsignalHandlerResolution::Send(
+                        Subsignal::Error(SubsignalError::Invalid)
+                            .sugar(&self.shared_secret, self.height.sending())
+                            .await?,
+                    )));
+                }
+                match content.route().await {
+                    Ok(res) => match res {
+                        Some(res) => Ok(Some(SubsignalHandlerResolution::Send(
+                            Subsignal::Content(Compressed::new(&res).await?)
+                                .sugar(&self.shared_secret, self.height.sending())
+                                .await?,
+                        ))),
+                        None => Ok(None),
+                    },
+                    Err(_) => Ok(Some(SubsignalHandlerResolution::Send(
+                        Subsignal::Error(SubsignalError::Invalid)
+                            .sugar(&self.shared_secret, self.height.sending())
+                            .await?,
+                    ))),
+                }
+            }
+            Subsignal::Error(err) => Err(anyhow!(err)),
             Subsignal::Disconnect => Ok(Some(SubsignalHandlerResolution::Disconnect)),
         }
     }

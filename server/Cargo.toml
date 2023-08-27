@@ -1,14 +1,17 @@
 [package]
 name = "nearssage_server"
-description = "Nearsagges's server 🏡"
+description = "Nearssages's server 🏡"
 version = "0.0.1"
 edition = "2021"
 
 [dependencies]
 nearssage_commons = { path = "../commons" }
 nearssage_protocol = { path = "../protocol" }
+nearssage_storage = { path = "../storage" }
 tokio = { version = "1.28", features = ["full"] }
-flume = "0.10"
+flume = "0.11"
+redb = "1.0"
+async-trait = "0.1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-appender = "0.2"
@@ -28,7 +31,6 @@ clap = { version = "4.3", features = ["derive"] }
 figment = { version = "0.10", features = ["toml"] }
 base64 = "0.21"
 colored = "2"
-derive_more = "0.99"
 either = "1"
 anyhow = "1"
 

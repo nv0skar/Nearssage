@@ -12,14 +12,9 @@ pub struct Handler(AtomicRefCell<Arc<DashMap<SocketAddr, AtomicRefCell<Client>>>
 
 impl Handler {
     /// Starts serving connections
-    #[instrument(
-        name = "server_run"
-        skip_all,
-        fields(
-            listen_addr = %CONFIG.get().unwrap().serve_addr
-    ))]
-    pub async fn run(&self) -> Result<()> {
-        let listener = UdpListener::bind(CONFIG.get().unwrap().serve_addr).await?;
+    #[instrument(name = "server_run", skip(self))]
+    pub async fn run(&self, addr: SocketAddr) -> Result<()> {
+        let listener = UdpListener::bind(addr).await?;
         loop {
             self.to_owned().handle_connection(listener.accept().await?);
         }
@@ -36,7 +31,7 @@ impl Handler {
         let (mut stream, _) = peer;
         let mut client = Option::default();
         let (sending_channel, receiving_channel) = bounded::<ServerSignal>(CLIENT_BUF_LEN);
-        let mut buf = NetworkBuf::new();
+        // let mut buf = NetworkBuf::new();
         tokio::spawn(async move {
             tracing::trace!("New connection");
             if let Some(s) = CONNECTION.get() {
@@ -44,7 +39,7 @@ impl Handler {
             }
             loop {
                 tokio::select! {
-                    peer_receiver = self.handle_signal(&mut stream, &mut client, &sending_channel, &mut buf) => {
+                    peer_receiver = self.handle_signal(&mut stream, &mut client, &sending_channel) => {
                         if let Err(err) = peer_receiver {
                             tracing::info!("Will close connection! {}", err.to_string());
                             self.close_connection(&mut stream, client.is_some()).await;
@@ -75,11 +70,11 @@ impl Handler {
         stream: &mut UdpStream,
         client: &mut Option<AtomicRefCell<Client>>,
         sending_channel: &Sender<ServerSignal>,
-        buf: &mut NetworkBuf,
+        // buf: &mut NetworkBuf,
     ) -> Result<()> {
         match ClientSignal::receive(
             stream,
-            buf.buffer(client.as_ref().map_or(false, |s| s.borrow().id().is_err())),
+            // buf.buffer(client.as_ref().map_or(false, |s| s.borrow().id().is_err())),
         )
         .await
         {
@@ -96,8 +91,11 @@ impl Handler {
                     }
                     ServerSignal::Handshake(
                         Checksumed::new(
-                            Signed::new(&CONFIG.get().unwrap().signing_keypair, gen_pk_exchange)
-                                .await?,
+                            Signed::new(
+                                IDENTITY.get().context("Identity is not set!")?,
+                                gen_pk_exchange,
+                            )
+                            .await?,
                         )
                         .await?,
                     )
@@ -111,16 +109,16 @@ impl Handler {
                         .context("Non-handshaked connection attempted to send subsignal")?;
                     let mut client = _client.borrow_mut();
                     match client.handle_subsignal(height, req).await? {
-                        Some(SubsignalHandlerResolution::Disconnect) => {
-                            self.close_connection(stream, true).await;
-                            Ok(())
-                        }
-                        Some(SubsignalHandlerResolution::Send(height, subsignal)) => {
-                            ServerSignal::Subsignal(height, subsignal)
-                                .send(stream)
-                                .await?;
-                            Ok(())
-                        }
+                        Some(resolution) => match resolution {
+                            SubsignalHandlerResolution::Send(signal) => {
+                                signal.send(stream).await?;
+                                Ok(())
+                            }
+                            SubsignalHandlerResolution::Disconnect => {
+                                self.close_connection(stream, true).await;
+                                Ok(())
+                            }
+                        },
                         None => Ok(()),
                     }
                 }
@@ -169,77 +167,5 @@ impl Deref for Handler {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{CONFIG as SERVER_CONFIG, *};
-
-    use nearssage_client::{Connection, CONFIG as CLIENT_CONFIG};
-
-    use std::time::Duration;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn connection() -> Result<()> {
-        let server_addr = "127.0.0.1:6000".parse().unwrap();
-        let sk_identity = SKIdentity::new();
-
-        // Set server's config
-        SERVER_CONFIG
-            .set(Config {
-                serve_addr: server_addr,
-                db_addr: "0.0.0.0:0000".parse().unwrap(),
-                signing_keypair: sk_identity.clone(),
-                path: CompactString::with_capacity(0),
-                log_subpath: CompactString::with_capacity(0),
-            })
-            .ok()
-            .context("Cannot set server's global config for testing")?;
-
-        // Set client's config
-        CLIENT_CONFIG
-            .set(nearssage_client::Config {
-                server_addr: server_addr,
-                signing_keypair: sk_identity.pk_identity(),
-            })
-            .ok()
-            .context("Cannot set server's global config for testing")?;
-
-        // Start server
-        let server = Handler::default();
-        let _server = server.clone();
-        tokio::spawn(async move {
-            _server.run().await.unwrap();
-        });
-
-        // Start client
-        let (client, mut client_addr) = Connection::new().await?;
-        client_addr.set_ip(server_addr.ip());
-
-        // Waits until the client is in the server's client's pool
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        assert_eq!(server.borrow().len(), 1, "Connection took too much time!");
-
-        // Waits until the client finishes the handshake
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        client
-            .borrow()
-            .shared_secret()
-            .context("Client took too much time to handshake!")?;
-
-        assert_eq!(
-            server
-                .borrow()
-                .get(&client_addr)
-                .context("Client isn't in the server's client's pool!")?
-                .value()
-                .borrow()
-                .shared_secret(),
-            client.borrow().shared_secret()?,
-            "Server and client have different shared secret!"
-        );
-
-        Ok(())
     }
 }

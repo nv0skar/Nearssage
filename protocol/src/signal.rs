@@ -39,22 +39,27 @@ pub struct Height {
 }
 
 /// Protocol's signal's error
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Error, PartialEq, Serialize, Deserialize, Debug)]
 pub enum SignalError {
     /// When the hanshake fails
+    #[error("Handshake failed")]
     HandshakeFailed,
     /// When sending malformed signals
+    #[error("Malformed signal")]
     Malformed,
 }
 
 /// Protocol's subsignal's error
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Error, PartialEq, Serialize, Deserialize, Debug)]
 pub enum SubsignalError {
     /// When the peer is trying to handshake multiple times
+    #[error("Already handshaked")]
     AlreadyHandshaked,
     /// When sending subsignals that cannot be fulfilled
+    #[error("Invalid subsignal")]
     Invalid,
     /// When the checksum isn't valid
+    #[error("Bad checksum")]
     BadChecksum,
 }
 

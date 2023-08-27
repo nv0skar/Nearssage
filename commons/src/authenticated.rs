@@ -36,7 +36,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn authentication() -> Result<()> {
-        // Generate some random data
+        // Generates some random data
         let random_bytes = SVec::from_slice(&rand::random::<[u8; 32]>());
 
         // Generates a random key for authentication

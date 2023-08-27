@@ -7,10 +7,7 @@ use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 
 /// Contains compressed data
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct Compressed<T: Clone + PartialEq + Encode>(
-    #[serde(skip_serializing)] PhantomData<T>,
-    Bytes,
-);
+pub struct Compressed<T: Clone + PartialEq + Encode>(#[serde(skip)] PhantomData<T>, Bytes);
 
 impl<T: Clone + PartialEq + Encode<Output = Bytes> + Decode<Input = [u8]>> Compressed<T> {
     /// Serializes and compresses data
