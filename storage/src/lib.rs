@@ -10,6 +10,8 @@ pub use object::*;
 use nearssage_commons::*;
 use nearssage_schema::*;
 
+use std::mem::transmute;
+
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use atomic_refcell::AtomicRefCell;
@@ -18,7 +20,7 @@ use paste::paste;
 use rclite::Arc;
 use redb::*;
 use tokio::sync::OnceCell;
-use tokio::task::*;
+use tokio::task::JoinSet;
 
 pub static DB: OnceCell<AtomicRefCell<Arc<Database>>> = OnceCell::const_new();
 
@@ -76,8 +78,7 @@ mod tests {
         );
 
         // Search the unique value's id by itself
-        let found_id = Preferences::search(retrieved_unique_value, true)
-            .await?
+        let found_id = Preferences::search(retrieved_unique_value, true)?
             .unwrap_left()
             .context("Unique value's id not found!")?;
 

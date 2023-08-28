@@ -96,7 +96,7 @@ pub trait Object<'a> {
     }
 
     /// Searches ids with the matching value
-    async fn search(
+    fn search(
         predicate: Self::Value,
         unique: bool,
     ) -> Result<Either<Option<Self::Key>, SVec<Self::Key>>> {
@@ -107,10 +107,15 @@ pub trait Object<'a> {
         for entry in table.iter()? {
             let (id, value) = entry?;
             let predicate = predicate.clone();
-            let (id, value) = (id.value().to_vec(), value.value().to_vec());
+
+            let id =
+                unsafe { transmute::<AccessGuard<'_, &[u8]>, AccessGuard<'static, &[u8]>>(id) };
+            let value =
+                unsafe { transmute::<AccessGuard<'_, &[u8]>, AccessGuard<'static, &[u8]>>(value) };
+
             search.spawn(async move {
-                if Self::Value::decode(&value).await?.eq(&predicate) {
-                    Ok(Some(Self::Key::into_key(&id)?))
+                if Self::Value::decode(&value.value()).await?.eq(&predicate) {
+                    Ok(Some(Self::Key::into_key(&id.value())?))
                 } else {
                     Ok(None)
                 }
@@ -118,7 +123,7 @@ pub trait Object<'a> {
         }
         match unique {
             true => {
-                while let Some(result) = search.join_next().await {
+                while let Some(result) = futures::executor::block_on(search.join_next()) {
                     if let Some(key) = result?? {
                         search.abort_all();
                         return Ok(Left(Some(key)));
@@ -128,7 +133,7 @@ pub trait Object<'a> {
             }
             false => {
                 let mut found = SVec::new();
-                while let Some(result) = search.join_next().await {
+                while let Some(result) = futures::executor::block_on(search.join_next()) {
                     if let Some(key) = result?? {
                         found.push(key);
                     }
