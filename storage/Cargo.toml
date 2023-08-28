@@ -5,6 +5,11 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+    "serde",
+] }
+type-rules = { version = "0.2", features = ["derive"] }
 nearssage_commons = { path = "../commons" }
 nearssage_schema = { path = "../schema" }
 tokio = { version = "1.28", features = ["full"] }
@@ -13,8 +18,6 @@ redb = "1.0"
 arrayvec = "0.7"
 rclite = "0.2"
 atomic_refcell = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-type-rules = { version = "0.2", features = ["derive"] }
 email_address = "0.2"
 phonenumber = "0.3"
 geo = { version = "0.26", features = ["use-serde"] }

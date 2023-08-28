@@ -7,7 +7,10 @@ edition = "2021"
 [dependencies]
 nearssage_commons = { path = "../commons" }
 arrayvec = { version = "0.7", features = ["serde"] }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+    "serde",
+] }
 type-rules = { version = "0.2", features = ["derive"] }
 email_address = "0.2"
 phonenumber = "0.3"
